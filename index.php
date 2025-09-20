@@ -108,24 +108,6 @@ if ($courseimageurl) :
 
 <?php
 
-
-
-    // $fs = get_file_storage();
-    // $files = $fs->get_area_files($context->id, 'course', 'overviewfiles', 0, 'sortorder', false);
-
-    // if ($files) {
-    //     $file = reset($files);
-    //     $url = moodle_url::make_pluginfile_url(
-    //         $file->get_contextid(),
-    //         $file->get_component(),
-    //         $file->get_filearea(),
-    //         $file->get_itemid(),
-    //         $file->get_filepath(),
-    //         $file->get_filename()
-    //     );
-    //     echo html_writer::empty_tag('img', ['src' => $url, 'alt' => '']);
-    // }
-
     $fs = get_file_storage();
 
     // Get the overview files (course image)
@@ -151,18 +133,65 @@ if ($courseimageurl) :
     <h1><?php echo format_string($course->fullname); ?></h1>
     <p><?php //echo format_string($course->summary); ?></p>
 
-</div>
 
-<?php
-// Get all SCORM modules in course
-$mods = get_fast_modinfo($course)->get_instances_of('scorm');
-$completioninfo = new \completion_info($course);
-?>
+    <?php
+
+    // ==========================================================================
+    // Get course modinfo (returns a course_modinfo object)
+    $modinfo = get_fast_modinfo($courseid);
+
+    // Now you can fetch SCORM modules
+    $scormcms = $modinfo->get_instances_of('scorm');
+
+    $scorms = [];
+    foreach ($scormcms as $cm) {
+        if ($cm->uservisible) {
+            $scorms[] = $cm;
+        }
+    }
+
+    // Get the first SCORM
+    $firstscorm = reset($scorms);
+
+    $buttonlabel = 'Commencer';
+
+    // Check if user has an attempt for the first SCORM
+    if ($firstscorm) {
+        // $attempt = $DB->get_field('scorm_scoes_track', 'attempt', ['userid' => $USER->id, 'scormid' => $firstscorm->instance]);
+        $attempt = $DB->get_field('scorm_attempt', 'attempt', ['scormid'=>$firstscorm->instance,'userid'=>$USER->id]);
+        
+
+        if ($attempt) {
+            $buttonlabel = 'Reprendre';
+        }
+    }
+    // 4. Print the button above the list
+    echo '<div class="general-scorm-btn">';
+    echo '<a href="' . (new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->id])) . '" class="btn btn-primary">';
+    echo $buttonlabel;
+    echo '</a>';
+    echo '</div>';
+
+
+    // ==========================================================================
+    // Get all SCORM modules in course
+    $mods = get_fast_modinfo($course)->get_instances_of('scorm');
+    // $completioninfo = new \completion_info($course);
+    ?>
+
+    <div class="spacer-30"></div>
+    <div class="spacer-30"></div>
+</div>
 
 <?php if (!empty($mods)) : ?>
 <div class="scorm-grid">
-    <?php foreach ($mods as $mod):
+    <?php 
+    
+    $lockNext = false; // flag: once we find the first incomplete/not attempted SCORM, lock the rest
+    
+    foreach ($mods as $mod):
         if (!$mod) { continue; }
+        
 
         $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
                 
@@ -211,13 +240,20 @@ $completioninfo = new \completion_info($course);
     <div class="scorm-card <?php echo $cardclass; ?>">
         <div class="scorm-thumb">
              <?php if ($cardclass === 'locked'): ?>
-                <div class="scorm-title locked-title"><?php echo $intro; ?> 🔒</div>
+                <div class="scorm-title locked-title"><?php echo $intro; ?></div>
+                <div class="lock"><img src="assets/img/icon_lock.png" alt=""></div>
             <?php else: ?>
                 <a href="<?php echo $url; ?>"><?php echo $intro; ?></a>
             <?php endif; ?>
         </div>
         <div class="scorm-details">
-            <strong><a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($mod->name); ?></a></strong>
+            <strong>
+                <?php if ($cardclass === 'locked'): ?>
+                    <div class="scorm-title"><?php echo format_string($mod->name); ?></div>
+                <?php else: ?>
+                    <a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($mod->name); ?></a>
+                 <?php endif; ?>
+            </strong>
             <div><span>Complétion : <?php echo $completion; ?></span> - Success : <?php echo $success; ?></span></div>
             <div>Tentative(s) : <?php echo $attemptcount; ?></div>
             <div>Total time : <?php echo $totaltime_in_seconds; ?>s</div>
