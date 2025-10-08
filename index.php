@@ -167,7 +167,7 @@ if ($courseimageurl) :
     }
     // 4. Print the button above the list
     echo '<div class="general-scorm-btn">';
-    echo '<a href="' . (new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->id])) . '" class="btn btn-primary">';
+    echo '<a href="' . (new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->id])) . '" class="btn btn-general">';
     echo $buttonlabel;
     echo '</a>';
     echo '</div>';
@@ -218,6 +218,21 @@ if ($courseimageurl) :
         $completion = 'inconnu';
         $success = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>18]);
         $completion = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>3]);
+
+        if ($success === 'passed') {
+            $success = get_string('success', 'local_customcourse');
+        } elseif ($success === 'failed') {
+            $success = get_string('failed', 'local_customcourse');
+        }   else {
+            $success = get_string('unknown', 'local_customcourse');
+        }
+        if ($completion === 'completed') {
+            $completion = get_string('completed', 'local_customcourse');
+        } elseif ($completion === 'incomplete') {
+            $completion = get_string('incomplete', 'local_customcourse');
+        }   else {
+            $completion = get_string('unknown', 'local_customcourse');
+        }
     
         $duration = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>2]);
         $totaltime_in_seconds = scorm_duration_to_seconds($duration);
@@ -247,22 +262,50 @@ if ($courseimageurl) :
             <?php endif; ?>
         </div>
         <div class="scorm-details">
-            <strong>
+            <strong class="title">
                 <?php if ($cardclass === 'locked'): ?>
                     <div class="scorm-title"><?php echo format_string($mod->name); ?></div>
                 <?php else: ?>
                     <a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($mod->name); ?></a>
                  <?php endif; ?>
             </strong>
-            <div><span>Complétion : <?php echo $completion; ?></span> - Success : <?php echo $success; ?></span></div>
-            <div>Tentative(s) : <?php echo $attemptcount; ?></div>
-            <div>Total time : <?php echo $totaltime_in_seconds; ?>s</div>
-            <div class="progress-bar">
-                <div class="progress-fill" data-progress="<?echo $progress; ?>">
-                    <div class="fill" style="width: <?php echo $progresspercent; ?>%"></div>
+            <div class="bottom-part">
+                <div class="details">
+                    <div class="inner-details">
+                        <div class="columns">
+                            <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><?php echo $completion; ?></div>
+                            <div><?php echo get_string('lbl_success', 'local_customcourse'); ?> : <?php echo $success; ?></div>
+                            <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><?php echo $totaltime_in_seconds; ?>s</div>
+                            <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><?php echo $progresspercent; ?>%</div>
+                            <div><?php echo get_string('lbl_attempt', 'local_customcourse'); ?><?php echo $attemptcount; ?></div>
+                        </div>
+                    </div>
+                    <div class="btns">
+                        <div class="btn btn-play ghost"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
+                    </div>
                 </div>
-                <div class="time-percent">
-                    <div class="progress-percent"><?php echo $progresspercent; ?>%</div>
+                <div class="details-bottom">
+                    <div class="inner-details">
+                        <div class="progress-bar">
+                            <div class="progress-fill" data-progress="<?echo $progress; ?>">
+                                <div class="fill" style="width: <?php echo $progresspercent; ?>%"></div>
+                            </div>
+                            <div class="time-percent">
+                                <div class="progress-percent"><?php echo $progresspercent; ?>%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btns">
+                        <?php if($status_done): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-play-again"><?php echo get_string('btn-play-again', 'local_customcourse'); ?></a>
+                        <?php elseif ($attemptcount > 0): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-continue"><?php echo get_string('btn-continue', 'local_customcourse'); ?></a>
+                        <?php elseif ($attemptcount == 0 && $cardclass !== 'locked'): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-play"><?php echo get_string('btn-play', 'local_customcourse'); ?></a>
+                        <?php else: ?>
+                            <div class="btn btn-play disabled"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
+                        <?php endif; ?> 
+                    </div>
                 </div>
             </div>
         </div>
