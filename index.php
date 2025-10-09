@@ -188,11 +188,14 @@ if ($courseimageurl) :
     <?php 
     
     $lockNext = false; // flag: once we find the first incomplete/not attempted SCORM, lock the rest
-    
+    $scormIndexDone = -1;
+    $scormIndex = 0;
+
     foreach ($mods as $mod):
         if (!$mod) { continue; }
         
-
+        $isScormAfterDone = false;
+        $scormIndex++;
         $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
                 
         $intro = $mod->get_formatted_content();
@@ -214,41 +217,47 @@ if ($courseimageurl) :
         $progresspercent = $progress * 100;
 
         // get success and completion
-        $success = 'inconnu';
-        $completion = 'inconnu';
-        $success = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>18]);
-        $completion = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>3]);
+        $success_raw = get_string('unknown', 'local_customcourse');
+        $completion_raw = get_string('unknown', 'local_customcourse');
+        $success_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>18]);
+        $completion_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>3]);
 
-        if ($success === 'passed') {
+        if ($success_raw === 'passed') {
             $success = get_string('success', 'local_customcourse');
-        } elseif ($success === 'failed') {
+        } elseif ($success_raw === 'failed') {
             $success = get_string('failed', 'local_customcourse');
         }   else {
-            $success = get_string('unknown', 'local_customcourse');
+            $success = ''; //get_string('unknown', 'local_customcourse');
         }
-        if ($completion === 'completed') {
+        if ($completion_raw === 'completed') {
             $completion = get_string('completed', 'local_customcourse');
-        } elseif ($completion === 'incomplete') {
+        } elseif ($completion_raw === 'incomplete') {
             $completion = get_string('incomplete', 'local_customcourse');
         }   else {
-            $completion = get_string('unknown', 'local_customcourse');
+            $completion = ''; // get_string('unknown', 'local_customcourse');
         }
     
         $duration = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>2]);
+        // Convert duration to seconds
         $totaltime_in_seconds = scorm_duration_to_seconds($duration);
 
-        // Check if SCORM is done
-        $status_done = ($completion === 'completed' && $success === 'passed');
 
-        // Default class
-        $cardclass = '';
-        
-        if ($lockNext) {
-            // Already found an incomplete one before: lock this
+        // Check if SCORM is done
+        $status_done = ($completion_raw === 'completed' && $success_raw === 'passed');
+        if($status_done) {
+            $scormIndexDone = $scormIndex;
+        }
+
+        // echo "current scorm index: $scormIndex / $scormIndexDone / $status_done<br>";
+        if($scormIndex === $scormIndexDone + 1 && $scormIndexDone > -1 && !$status_done) {
+            $isScormAfterDone = true;
+        } 
+        if ($isScormAfterDone) {
+            $cardclass = 'current';
+        } else if ($status_done) {
+            $cardclass = 'completed';
+        } else {
             $cardclass = 'locked';
-        } elseif (!$status_done) {
-            // First not completed: mark it as active, lock the following
-            $lockNext = true;
         }
 
     ?>
@@ -273,11 +282,11 @@ if ($courseimageurl) :
                 <div class="details">
                     <div class="inner-details">
                         <div class="columns">
-                            <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><?php echo $completion; ?></div>
-                            <div><?php echo get_string('lbl_success', 'local_customcourse'); ?> : <?php echo $success; ?></div>
-                            <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><?php echo $totaltime_in_seconds; ?>s</div>
-                            <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><?php echo $progresspercent; ?>%</div>
-                            <div><?php echo get_string('lbl_attempt', 'local_customcourse'); ?><?php echo $attemptcount; ?></div>
+                            <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><?php echo $completion; ?></b></div>
+                            <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="red"><?php echo $success; ?></span></b></div>
+                            <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><b><?php echo ($cardclass === 'locked' ? '' :  $totaltime_in_seconds . 's'); ?></b></div>
+                            <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span class="red"><?php echo ($cardclass === 'locked' ? '' : $progresspercent . '%'); ?></span></b></div>
+                            <div><?php echo get_string('lbl_attempt', 'local_customcourse'); ?><b><?php echo $attemptcount; ?></b></div>
                         </div>
                     </div>
                     <div class="btns">

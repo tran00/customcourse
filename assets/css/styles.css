@@ -143,6 +143,9 @@
   width: -moz-fit-content;
   width: fit-content;
 }
+.red {
+  color: #ff0000;
+}
 
 .spacer-120 {
   height: 120px;
