@@ -155,10 +155,6 @@ if ($courseimageurl) :
     ?>
 
 
-    <div class="course-thumb"><img src="<?php echo $courseimg_url ; ?>" alt=""></div>
-    <h1><?php echo format_string($course->fullname); ?></h1>
-    <p><?php //echo format_string($course->summary); ?></p>
-
 
     <?php
 
@@ -198,6 +194,7 @@ if ($courseimageurl) :
     $lockNext = false; // flag: once we find the first incomplete/not attempted SCORM, lock the rest
     $scormIndexDone = -1;
     $scormIndex = 0;
+
 
     foreach ($mods as $mod):
         if (!$mod) { continue; }
@@ -241,6 +238,24 @@ if ($courseimageurl) :
         $buttonlabel = get_string('btn-play', 'local_customcourse');
     }
 
+    $courseprogresspercent =  round(($scormIndexDone > 0 ? $scormIndexDone : 0) * 100 / count($mods));
+
+    // ==========================================================================
+    ?>
+    <div class="course-thumb"><img src="<?php echo $courseimg_url ; ?>" alt=""></div>
+    <div class="course-progress-bar">
+        <div class="course-progress-fill" data-progress="<?php echo $courseprogresspercent; ?>">
+            <div class="course-fill" style="width: <?php echo $courseprogresspercent; ?>%"></div>
+            <div class="time-percent">
+                <div class="progress-percent"><?php echo $courseprogresspercent; ?>%</div>
+            </div>
+        </div>
+    </div>
+    <h1><?php echo format_string($course->fullname); ?></h1>
+    <p><?php //echo format_string($course->summary); ?></p>
+
+    <?php
+    // ==========================================================================
 
     // 4. Print the button above the list
     echo '<div class="general-scorm-btn">';

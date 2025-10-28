@@ -10,6 +10,31 @@
 .course-header h1 {
   margin: 30px 0 30px;
 }
+.course-header .course-progress-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  background-color: transparent;
+  width: 100%;
+  color: black;
+}
+.course-header .course-progress-bar .time-percent {
+  margin-left: 10px;
+}
+.course-header .course-progress-bar .course-progress-fill {
+  background: #eee;
+  height: 10px;
+  overflow: hidden;
+  flex: 1 1 75%;
+  margin-bottom: -2px;
+}
+.course-header .course-progress-bar .course-progress-fill .course-fill {
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.5s ease;
+  /* smooth animation */
+}
 
 .course-hero {
   background-size: cover;
