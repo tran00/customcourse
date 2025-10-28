@@ -32,6 +32,12 @@
   margin: auto;
   margin-bottom: 2em;
 }
+.scorm-grid .red {
+  color: red;
+}
+.scorm-grid .green {
+  color: #4caf50;
+}
 
 .scorm-card {
   border: 1px solid #eee;
@@ -143,9 +149,6 @@
   width: -moz-fit-content;
   width: fit-content;
 }
-.red {
-  color: #ff0000;
-}
 
 .spacer-120 {
   height: 120px;
@@ -248,4 +251,23 @@
   background: #4caf50;
   transition: width 0.5s ease;
   /* smooth animation */
+}
+
+.circle-progress {
+  --size: 1em;
+  /* same height as text */
+  --stroke: 2px;
+  --color: #4caf50;
+  /* progress color */
+  --bg: #eee;
+  /* background circle */
+  --percent: 75;
+  /* fallback */
+  display: inline-block;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: conic-gradient(var(--color) calc(var(--percent) * 1%), var(--bg) 0);
+  top: 2px;
+  position: relative;
 }/*# sourceMappingURL=styles.css.map */
