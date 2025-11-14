@@ -196,18 +196,37 @@ if ($courseimageurl) :
 
             // ==========================================================================
             // Get course modinfo (returns a course_modinfo object)
-            $modinfo = get_fast_modinfo($courseid);
+            // $modinfo = get_fast_modinfo($courseid);
 
-            // Get all SCORM modules in course
-            $mods = get_fast_modinfo($course)->get_instances_of('scorm');
+            // // Get all SCORM modules in course
+            // $mods = get_fast_modinfo($course)->get_instances_of('scorm');
 
-            // fetch SCORM modules
-            $scormcms = $modinfo->get_instances_of('scorm');
+            // // fetch SCORM modules
+            // $scormcms = $modinfo->get_instances_of('scorm');
 
+            // $scorms = [];
+            // foreach ($scormcms as $cm) {
+            //     if ($cm->uservisible) {
+            //         $scorms[] = $cm;
+            //     }
+            // }
+            // Fetch all SCORM modules truly attached to this course
+            $sql = "
+                SELECT cm.id AS cmid, cm.instance AS scormid, cm.visible, s.*, cm.section
+                FROM {course_modules} cm
+                JOIN {modules} m ON m.id = cm.module
+                JOIN {scorm} s ON s.id = cm.instance
+                WHERE cm.course = :courseid
+                AND m.name = 'scorm'
+                ORDER BY cm.section, cm.id
+            ";
+            $mods = $DB->get_records_sql($sql, ['courseid' => $courseid]);
+
+            // Optional: only include visible modules for the user
             $scorms = [];
-            foreach ($scormcms as $cm) {
-                if ($cm->uservisible) {
-                    $scorms[] = $cm;
+            foreach ($mods as $mod) {
+                if ($mod->visible) {
+                    $scorms[] = $mod;
                 }
             }
 
@@ -234,11 +253,22 @@ if ($courseimageurl) :
 
             foreach ($mods as $mod):
                 if (!$mod) { continue; }
+                
+                $scorm = $DB->get_record('scorm', ['id' => $mod->scormid]);
+                if (!$scorm) {
+                    continue;
+                }
+
+
                 $scormIndex++;
                 $isScormAfterDone = false;
-                $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
-                $scorm = $DB->get_record('scorm', ['id' => $cm->instance], '*', MUST_EXIST);
-                $url = new moodle_url('/mod/scorm/view.php', ['id' => $cm->id]);
+                // $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
+                // $scorm = $DB->get_record('scorm', ['id' => $cm->instance], '*', MUST_EXIST);
+                // $url = new moodle_url('/mod/scorm/view.php', ['id' => $cm->id]);
+
+                $cmid = $mod->cmid;   // from our query
+                $url = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
+
 
                 $scormVersion = $scorm->version;
             
@@ -328,15 +358,26 @@ if ($courseimageurl) :
 
             foreach ($mods as $mod):
                 if (!$mod) { continue; }
-                
+
+                // Skip if SCORM record doesn’t exist (means deleted)
+                $scorm = $DB->get_record('scorm', ['id' => $mod->scormid]);
+                if (!$scorm) {
+                    continue;
+                }
+                            
                 $isScormAfterDone = false;
                 $scormIndex++;
-                $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
+                // $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
+                // $scorm = $DB->get_record('scorm', ['id' => $cm->instance], '*', MUST_EXIST);
+                // $url = new moodle_url('/mod/scorm/view.php', ['id' => $cm->id]);
                         
-                $intro = $mod->get_formatted_content();
-                $url = new moodle_url('/mod/scorm/view.php', ['id' => $cm->id]);
+                $cmid = $mod->cmid;   // from our query
+                $url = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
+                // $scorm = $mod;
+
+                // $intro = $mod->get_formatted_content();
+                $intro = format_module_intro('scorm', $scorm, $mod->cmid);
                 
-                $scorm = $DB->get_record('scorm', ['id' => $cm->instance], '*', MUST_EXIST);
                 $scormid = $scorm->id;
                 $userid = $USER->id;
                 $scormVersion = $scorm->version;
