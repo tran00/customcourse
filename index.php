@@ -246,10 +246,12 @@ if ($courseimageurl) :
             //     }
             // }
 
-            $lockNext = false; // flag: once we find the first incomplete/not attempted SCORM, lock the rest
+            // First pass: determine which SCORM to link to in the button and calculate overall progress
+            $buttonUrl = null;
+            $buttonLabel = '';
             $scormIndexDone = -1;
             $scormIndex = 0;
-
+            $visibleModsCount = 0;
 
             foreach ($mods as $mod):
                 if (!$mod) { continue; }
@@ -259,26 +261,22 @@ if ($courseimageurl) :
                     continue;
                 }
 
-
                 $scormIndex++;
-                $isScormAfterDone = false;
-                // $cm = get_coursemodule_from_id('scorm', $mod->id, $course->id, false, MUST_EXIST);
-                // $scorm = $DB->get_record('scorm', ['id' => $cm->instance], '*', MUST_EXIST);
-                // $url = new moodle_url('/mod/scorm/view.php', ['id' => $cm->id]);
-
-                $cmid = $mod->cmid;   // from our query
-                $url = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
-
-
+                $visibleModsCount++;
+                $cmid = $mod->cmid;
                 $scormVersion = $scorm->version;
-            
-
                 $scormid = $scorm->id;
                 $userid = $USER->id;
+
                 // Get all attempts for this user and SCORM
                 $attemptid = $DB->get_field('scorm_attempt', 'id', ['scormid'=>$scormid,'userid'=>$userid]);
                 $attemptcount = $DB->get_field('scorm_attempt', 'attempt', ['scormid'=>$scormid,'userid'=>$userid]);
-                // get success and completion
+                
+                // get success and completion based on version
+                $status_done = false;
+                $completion_raw = null;
+                $success_raw = null;
+                
                 if( $scormVersion != "SCORM_1.2") {
                     $success_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]);
                     $completion_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]);
@@ -287,31 +285,37 @@ if ($courseimageurl) :
                     $lesson_status = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]);
                     $status_done = ($lesson_status === 'completed' || $lesson_status === 'passed');
                 }
-                // echo $scormIndex . ' - ' . $completion_raw . ' / ' . $success_raw . '<br>';
 
-                // Check if SCORM is done
+                // Track the last completed SCORM
                 if($status_done) {
                     $scormIndexDone = $scormIndex;
                 }
 
-                if($scormIndexDone !== -1 && $scormIndexDone != $scormIndex) {
-                    // previous mod was done
-                    if($completion_raw === 'incomplete' || $success_raw === 'failed' ) {
-                        $buttonlabel = get_string('btn-continue', 'local_customcourse');
-                    } else {
-                        $buttonlabel = get_string('btn-play', 'local_customcourse');
+                // If we haven't set a button URL yet, determine it based on sequence
+                if ($buttonUrl === null) {
+                    if ($scormIndexDone === -1 && $scormIndex === 1) {
+                        // No SCORMs done yet - link to first SCORM
+                        $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
+                        $buttonLabel = get_string('btn-play', 'local_customcourse');
+                    } elseif ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
+                        // This is the next unlocked SCORM after completion
+                        $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
+                        if($completion_raw === 'incomplete' || $success_raw === 'failed') {
+                            $buttonLabel = get_string('btn-continue', 'local_customcourse');
+                        } else {
+                            $buttonLabel = get_string('btn-play', 'local_customcourse');
+                        }
                     }
-                    break; // Exit the foreach loop and use current $url
                 }
             endforeach;
 
-            // if no scorm done yet, set button to first scorm
-            if ($scormIndexDone === -1 && $firstscorm) {
-                $url = new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->id]);
-                $buttonlabel = get_string('btn-play', 'local_customcourse');
+            // Fallback: if no URL was set, link to first available SCORM
+            if ($buttonUrl === null && $firstscorm) {
+                $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->cmid]);
+                $buttonLabel = get_string('btn-play', 'local_customcourse');
             }
 
-            $courseprogresspercent =  round(($scormIndexDone > 0 ? $scormIndexDone : 0) * 100 / count($mods));
+            $courseprogresspercent =  round(($scormIndexDone > 0 ? $scormIndexDone : 0) * 100 / $visibleModsCount);
 
             // ==========================================================================
             ?>
@@ -332,10 +336,11 @@ if ($courseimageurl) :
 
             // 4. Print the button above the list
             echo '<div class="general-scorm-btn">';
-            // echo '<a href="' . (new moodle_url('/mod/scorm/view.php', ['id' => $firstscorm->id])) . '" class="btn btn-general">';
-            echo '<a href="' . $url . '" class="btn btn-general">';
-            echo $buttonlabel;
-            echo '</a>';
+            if ($buttonUrl) {
+                echo '<a href="' . $buttonUrl . '" class="btn btn-general">';
+                echo $buttonLabel;
+                echo '</a>';
+            }
             echo '</div>';
 
 
@@ -351,8 +356,7 @@ if ($courseimageurl) :
         <div class="scorm-grid">
             <?php 
             
-            $lockNext = false; // flag: once we find the first incomplete/not attempted SCORM, lock the rest
-            // $scormIndexDone = -1;
+            // Reset counter for second pass through the grid
             $scormIndex = 0;
 
             foreach ($mods as $mod):
