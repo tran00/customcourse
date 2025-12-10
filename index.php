@@ -539,18 +539,18 @@ if ($courseimageurl) :
                                     </div>
                                 </div>
                             </div>
-                            <div class="btns">
-                                <?php if($status_done): ?>
-                                    <a href="<?php echo $url; ?>" class="btn btn-play-again"><?php echo get_string('btn-play-again', 'local_customcourse'); ?></a>
-                                <?php elseif ($attemptcount > 0): ?>
-                                    <a href="<?php echo $url; ?>" class="btn btn-continue"><?php echo get_string('btn-continue', 'local_customcourse'); ?></a>
-                                <?php elseif ($attemptcount == 0 && $cardclass !== 'locked'): ?>
-                                    <a href="<?php echo $url; ?>" class="btn btn-play"><?php echo get_string('btn-play', 'local_customcourse'); ?></a>
-                                <?php else: ?>
-                                    <div class="btn btn-play disabled"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
-                                <?php endif; ?> 
-                            </div>
                         </div>
+                    </div>
+                    <div class="btns">
+                        <?php if($status_done): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-play-again"><?php echo get_string('btn-play-again', 'local_customcourse'); ?></a>
+                        <?php elseif ($attemptcount > 0): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-continue"><?php echo get_string('btn-continue', 'local_customcourse'); ?></a>
+                        <?php elseif ($attemptcount == 0 && $cardclass !== 'locked'): ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-play"><?php echo get_string('btn-play', 'local_customcourse'); ?></a>
+                        <?php else: ?>
+                            <div class="btn btn-play disabled"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
+                        <?php endif; ?> 
                     </div>
                 </div>
             </div>

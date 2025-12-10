@@ -142,12 +142,13 @@
         }
 
         .scorm-details {
+            position: relative;
             flex: 1 1 auto;
             padding: 0.5em 1em 1em;
             display: flex;
             flex-direction: column;
             /* stack children vertically */
-            justify-content: space-between;
+            justify-content: flex-start;
             /* push top and bottom apart */
             height: 100%;
             gap: 0.5em;
@@ -173,18 +174,11 @@
                         }
 
                     }
-
-                    .btns {
-                        flex: 0 0 auto;
-                        display: flex;
-                        justify-content: flex-end;
-                        align-items: flex-end;
-                    }
                 }
 
                 .details-bottom {
                     display: flex;
-                    margin-top: -7px;
+                    margin-top: 5px;
 
                     .inner-details {
                         flex: 1;
@@ -259,6 +253,16 @@
                     z-index: 1;
                     top: 1px;
                 }
+            }
+
+            .btns {
+                position: absolute;
+                bottom: 1em;
+                right: 1em;
+                flex: 0 0 auto;
+                display: flex;
+                justify-content: flex-end;
+                align-items: flex-end;
             }
         }
 
@@ -404,8 +408,8 @@
         justify-content: space-between;
         align-items: center;
         background-color: transparent;
-        width: 33%;
-        width: 43%;
+        // width: 33%;
+        // width: 43%;
         color: black;
 
         .time-percent {
@@ -421,6 +425,7 @@
             overflow: hidden;
             flex: 1 1 75%;
             margin-bottom: -2px;
+            width: 170px;
 
             .fill {
                 height: 100%;
