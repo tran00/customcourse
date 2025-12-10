@@ -98,7 +98,7 @@
         align-items: stretch;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         transition: transform 0.2s;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
 
         &:hover {
             transform: translateY(-3px);
@@ -107,7 +107,9 @@
         .scorm-thumb {
             position: relative;
             flex: 0 0 250px;
+            flex: 0 0 270px;
             height: 180px;
+            height: 160px;
 
             p {
                 margin: 0;
@@ -151,9 +153,11 @@
             gap: 0.5em;
             font-size: 14px;
             height: 180px;
+            height: 160px;
 
             .title {
                 align-self: flex-start;
+                margin-top: 5px;
             }
 
             .bottom-part {
@@ -180,6 +184,7 @@
 
                 .details-bottom {
                     display: flex;
+                    margin-top: -7px;
 
                     .inner-details {
                         flex: 1;
@@ -313,7 +318,7 @@
 
     .scorm-title {
         font-size: 26px;
-        line-height: 31px;
+        line-height: 28px;
         color: black;
         text-decoration: none;
 
@@ -400,6 +405,7 @@
         align-items: center;
         background-color: transparent;
         width: 33%;
+        width: 43%;
         color: black;
 
         .time-percent {

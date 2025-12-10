@@ -345,7 +345,6 @@ if ($courseimageurl) :
             ?>
 
             <div class="spacer-30"></div>
-            <div class="spacer-30"></div>
         </div>
 
         <?php if (!empty($mods)) : ?>

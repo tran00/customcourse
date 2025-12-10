@@ -75,7 +75,7 @@
   align-items: stretch;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 .custom-course-container .scorm-card:hover {
   transform: translateY(-3px);
@@ -83,7 +83,9 @@
 .custom-course-container .scorm-card .scorm-thumb {
   position: relative;
   flex: 0 0 250px;
+  flex: 0 0 270px;
   height: 180px;
+  height: 160px;
 }
 .custom-course-container .scorm-card .scorm-thumb p {
   margin: 0;
@@ -123,9 +125,11 @@
   gap: 0.5em;
   font-size: 14px;
   height: 180px;
+  height: 160px;
 }
 .custom-course-container .scorm-card .scorm-details .title {
   align-self: flex-start;
+  margin-top: 5px;
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details {
   display: flex;
@@ -147,6 +151,7 @@
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details-bottom {
   display: flex;
+  margin-top: -7px;
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details-bottom .inner-details {
   flex: 1;
@@ -248,7 +253,7 @@
 }
 .custom-course-container .scorm-title {
   font-size: 26px;
-  line-height: 31px;
+  line-height: 28px;
   color: black;
   text-decoration: none;
 }
@@ -321,6 +326,7 @@
   align-items: center;
   background-color: transparent;
   width: 33%;
+  width: 43%;
   color: black;
 }
 .custom-course-container .progress-bar .time-percent {
