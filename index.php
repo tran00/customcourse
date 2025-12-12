@@ -473,7 +473,9 @@ if ($courseimageurl) :
 
                 // Get localized SCORM title if available
                 $scorm_title = $mod->name;
-                $localized_title_key = str_replace([' ', "'"], '_', $scorm_title); // Create key from SCORM name (normalize spaces and apostrophes)
+                // Normalize title: remove accents, replace spaces and apostrophes with underscores
+                $normalized_title = iconv('UTF-8', 'ASCII//TRANSLIT', $scorm_title);
+                $localized_title_key = str_replace([' ', "'"], '_', $normalized_title);
                 if (get_string_manager()->string_exists($localized_title_key, 'local_customcourse')) {
                     $scorm_title = get_string($localized_title_key, 'local_customcourse');
                 }
