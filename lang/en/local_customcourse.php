@@ -17,18 +17,18 @@ $string['btn-play'] = 'Start';
 
 // SCORM Title Localizations (French names normalized as keys)
 // Keys match the pattern: str_replace([' ', "'"], '_', $scorm_title) for French SCORM names
-$string['L_imprimante'] = 'The Printer';
-$string['La_messagerie'] = 'Messaging';
-$string['Les_reseaux_sociaux'] = 'Social Networks';
-$string['Le_mot_de_passe'] = 'Password';
-$string['La_clef_USB'] = 'USB Key';
-$string['Le_badge'] = 'Badge';
-$string['Le_poste_de_travail'] = 'Workstation';
-$string['Les_informations_sensibles'] = 'Sensitive Information';
-$string['Les_terminaux_mobiles'] = 'Mobile Devices';
+$string['L_imprimante'] = 'The printer';
+$string['La_messagerie'] = 'Emails';
+$string['Les_reseaux_sociaux'] = 'Social networks';
+$string['Le_mot_de_passe'] = 'Passwords';
+$string['La_clef_USB'] = 'The USB keys';
+$string['Le_badge'] = 'The access card';
+$string['Le_poste_de_travail'] = 'Work station';
+$string['Les_informations_sensibles'] = 'Sensitive data';
+$string['Les_terminaux_mobiles'] = 'Mobile devices';
 $string['Internet'] = 'Internet';
-$string['L_ingenierie_sociale'] = 'Social Engineering';
-$string['Je_teletravaille_a_la_maison'] = 'Working From Home';
-$string['Je_teletravaille_de_partout'] = 'Working From Anywhere';
+$string['L_ingenierie_sociale'] = 'Social engineering';
+$string['Je_teletravaille_a_la_maison'] = 'I work from home';
+$string['Je_teletravaille_de_partout'] = 'I work from anywhere';
 $string['RGPD'] = 'GDPR';
-$string['C_est_quoi_le_phishing'] = 'What is Phishing?';
+$string['C_est_quoi_le_phishing'] = 'What is phishing?';
