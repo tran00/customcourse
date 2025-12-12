@@ -103,6 +103,50 @@ The plugin includes language strings in `lang/en/local_customcourse.php`:
 - `btn-play-again`: Replay button text
 - `locked_message`: Message shown on locked SCORMs
 
+### SCORM Title Localization
+
+You can localize SCORM titles by adding language string entries to your language files. The system automatically converts SCORM names to string keys by replacing spaces with underscores.
+
+**Example:**
+If your SCORM module is named "The Printer", add this to your language files:
+
+```php
+// In lang/en/local_customcourse.php
+$string['The_Printer'] = 'The Printer';
+
+// In lang/fr/local_customcourse.php
+$string['The_Printer'] = 'L\'imprimante';
+```
+
+The plugin will:
+1. Take the SCORM name from the course module (e.g., "The Printer")
+2. Convert it to a string key by replacing spaces with underscores (e.g., "The_Printer")
+3. Check if that string exists in the language file
+4. Display the localized version if found, otherwise display the original SCORM name
+
+**Pre-configured Localizations:**
+The plugin comes with pre-configured SCORM titles for common security training modules:
+- `The_Printer` - L'imprimante
+- `Messaging` - La messagerie
+- `Social_Networks` - Les réseaux sociaux
+- `Password` - Le mot de passe
+- `USB_Key` - La clef USB
+- `Badge` - Le badge
+- `Workstation` - Le poste de travail
+- `Sensitive_Information` - Les informations sensibles
+- `Mobile_Devices` - Les terminaux mobiles
+- `Internet` - Internet
+- `Social_Engineering` - L'ingénierie sociale
+- `Working_From_Home` - Je télétravaille à la maison
+- `Working_From_Anywhere` - Je télétravaille de partout
+- `GDPR` - RGPD
+- `What_is_Phishing` - C'est quoi le phishing ?
+
+To add more localizations for your specific SCORMs:
+1. Edit the corresponding language file (`lang/[language_code]/local_customcourse.php`)
+2. Add a new entry with the SCORM name as key (spaces replaced by underscores) and the localized text as value
+3. No code changes needed - the plugin will automatically detect and use the new string
+
 ## Configuration
 
 No additional configuration is required beyond standard Moodle SCORM setup. However, you can:

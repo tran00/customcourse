@@ -471,6 +471,13 @@ if ($courseimageurl) :
                     $cardclass = 'locked';
                 }
 
+                // Get localized SCORM title if available
+                $scorm_title = $mod->name;
+                $localized_title_key = str_replace([' ', "'"], '_', $scorm_title); // Create key from SCORM name (normalize spaces and apostrophes)
+                if (get_string_manager()->string_exists($localized_title_key, 'local_customcourse')) {
+                    $scorm_title = get_string($localized_title_key, 'local_customcourse');
+                }
+
             ?>
             <div class="scorm-card <?php echo $cardclass; ?>">
                 <div class="scorm-thumb">
@@ -484,9 +491,9 @@ if ($courseimageurl) :
                 <div class="scorm-details">
                     <strong class="title">
                         <?php if ($cardclass === 'locked'): ?>
-                            <div class="scorm-title"><?php echo format_string($mod->name); ?></div>
+                            <div class="scorm-title"><?php echo format_string($scorm_title); ?></div>
                         <?php else: ?>
-                            <a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($mod->name); ?></a>
+                            <a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($scorm_title); ?></a>
                         <?php endif; ?>
                     </strong>
                     <div class="bottom-part">
