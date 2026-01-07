@@ -1,7 +1,7 @@
 <?php
 $string['pluginname'] = 'Custom course progress';
 $string['customcourse:view'] = 'View custom course page';
-$string['lbl_completion'] = 'Status: ';
+$string['lbl_completion'] = 'Completion: ';
 $string['lbl_success'] = 'Result: ';
 $string['success'] = 'Passed';
 $string['failed'] = 'Failed';
