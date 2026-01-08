@@ -629,24 +629,28 @@ if ($courseimageurl) :
                         <div class="details">
                             <div class="inner-details">
                                 <div class="columns">
-                                    <?php if( $scormVersion != "SCORM_1.2") : ?>
-                                        <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><span class="<?php echo $style_completion; ?>"><?php echo $completion; ?></span></b></div>
-                                        <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
-                                    <?php else: ?>
-                                        <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><span class="<?php echo $style_completion; ?>"><?php echo $lesson_status; ?></span></b></div>
-                                        <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
-                                    <?php endif; ?>
-                                    <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><b><?php echo $totaltime_in_seconds; ?></b></div>
+                                    <div class="first-col col">
+                                        <?php if( $scormVersion != "SCORM_1.2") : ?>
+                                            <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><span class="<?php echo $style_completion; ?>"><?php echo $completion; ?></span></b></div>
+                                            <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
+                                        <?php else: ?>
+                                            <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><span class="<?php echo $style_completion; ?>"><?php echo $lesson_status; ?></span></b></div>
+                                            <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
+                                        <?php endif; ?>
+                                    </div>
 
-                                
-                                    <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span class="<?php echo $style_score; ?>"><?php echo $score_raw . '/' . $scoreMax; ?></span></b></div>
-                                
+                                    <div class="second-col col">
+                                        <div class="force-second-column"><?php echo get_string('lbl_time', 'local_customcourse'); ?><b><?php echo $totaltime_in_seconds; ?></b></div>
+
+                                    
+                                        <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span class="<?php echo $style_score; ?>"><?php echo ($scoreMax > 0) ? round(($score_raw / $scoreMax) * 100) . '%' : '0%'; ?></span></b></div>
+                                    
                                     <?php /*
 
                                     <div class="score" data-score="<?php echo ($cardclass === 'locked' ? '' : $score_raw); ?>"><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span><?php echo ($cardclass === 'locked' ? '' : $score_html); ?></span></b></div>
                                     */ ?>
 
-                                    <div style="visibility:hidden"><?php echo get_string('lbl_attempt', 'local_customcourse'); ?><b><?php echo $attemptcount; ?></b></div>
+                                        <div style="display:none"><?php echo get_string('lbl_attempt', 'local_customcourse'); ?><b><?php echo $attemptcount; ?></b></div>
 
                                     <?php /*
                                     <div class="score-wrapper">
@@ -658,6 +662,7 @@ if ($courseimageurl) :
                                         <?php endif; ?>
                                     </div>
                                     */ ?>
+                                    </div>
                                 </div>
                             </div>
                             <div class="btns">

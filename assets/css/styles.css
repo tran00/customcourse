@@ -89,6 +89,10 @@
 }
 .custom-course-container .scorm-card .scorm-thumb p {
   margin: 0;
+  height: 100%;
+}
+.custom-course-container .scorm-card .scorm-thumb .no-overflow {
+  height: 100%;
 }
 .custom-course-container .scorm-card .scorm-thumb img {
   width: 100%;
@@ -115,7 +119,7 @@
 }
 .custom-course-container .scorm-card .scorm-details {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1;
   padding: 0.5em 1em 1em;
   display: flex;
   flex-direction: column;
@@ -136,13 +140,14 @@
   display: flex;
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details .inner-details {
-  flex: 1;
+  flex: 0 0 70%;
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details .inner-details .columns {
-  -moz-column-count: 3;
-       column-count: 3;
-  -moz-column-gap: 10px;
-       column-gap: 10px;
+  width: 100%;
+  display: flex;
+}
+.custom-course-container .scorm-card .scorm-details .bottom-part .details .inner-details .columns .first-col {
+  padding-left: 0;
 }
 .custom-course-container .scorm-card .scorm-details .bottom-part .details-bottom {
   display: flex;
@@ -341,7 +346,12 @@
   overflow: hidden;
   flex: 1 1 75%;
   margin-bottom: -2px;
-  width: 170px;
+  width: 178px;
+}
+@media (max-width: 768px) {
+  .custom-course-container .progress-bar .progress-fill {
+    width: 163px;
+  }
 }
 .custom-course-container .progress-bar .progress-fill .fill {
   height: 100%;
