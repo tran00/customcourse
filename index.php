@@ -1,6 +1,9 @@
 <?php
 // Minimal custom course page with SCORM list and progress
 
+// DEBUG MODE - Set to true to show debug output, false to hide
+define('CUSTOMCOURSE_DEBUG', false);
+
 require_once(__DIR__ . '/../../config.php');
 
 global $DB, $USER, $PAGE, $OUTPUT;
@@ -281,6 +284,8 @@ if ($courseimageurl) :
             $scormIndexStarted = -1;
             $scormIndex = 0;
             $visibleModsCount = 0;
+            $debugOutput = array();
+            $debugFirstPass = array();
 
             foreach ($mods as $mod):
                 if (!$mod) { continue; }
@@ -303,7 +308,7 @@ if ($courseimageurl) :
                 
                 // get progress
                 $progress = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]);
-                $progresspercent = $progress * 100;
+                $progresspercent = ($progress !== null) ? $progress * 100 : 0;
                 
                 // get success and completion based on version
                 $status_done = false;
@@ -320,8 +325,12 @@ if ($courseimageurl) :
                 }
 
                 // Track the last completed SCORM and first started SCORM
-                if($status_done || $progresspercent >= 100) {
+                // Only mark as done if progress >= 100 (don't rely on status_done if progress is 0)
+                if($progresspercent >= 100) {
                     $scormIndexDone = $scormIndex;
+                    if (CUSTOMCOURSE_DEBUG) {
+                        $debugFirstPass[] = "SCORM $scormIndex marked as done (progress=$progresspercent%)";
+                    }
                 }
                 if($progresspercent > 0 && $scormIndexStarted === -1) {
                     $scormIndexStarted = $scormIndex;
@@ -436,7 +445,7 @@ if ($courseimageurl) :
                 $progress = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]);
                 //echo $attemptid . ' // ' . $element_ids['cmi.progress_measure'] . ' // ' . $progress . '<br>';
                 // normalize progress to percent
-                $progresspercent = $progress * 100;
+                $progresspercent = ($progress !== null) ? $progress * 100 : 0;
 
                 // Get duration early - will be overridden if progress is 0
                 $duration = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.total_time']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.total_time']]);
@@ -526,9 +535,25 @@ if ($courseimageurl) :
                 // if($status_done) {
                 //     $scormIndexDone = $scormIndex;
                 // }                // Determine if this SCORM is unlocked (started or finished)
-                // echo "current scorm index: $scormIndex / $scormIndexDone / $progresspercent<br>";
-                $isUnlocked = ($scormIndex <= $scormIndexDone + 1 && $scormIndexDone > -1) || ($scormIndexDone === -1 && $scormIndex === 1);
+                // Only the FIRST incomplete SCORM should be 'current' and unlocked
+                // Or if it's already started/in progress
+                // OR if it's already completed
+                $isUnlocked = false;
+                if ($progresspercent >= 100) {
+                    // Completed SCORMs are always unlocked
+                    $isUnlocked = true;
+                } else if ($progresspercent > 0) {
+                    // In-progress SCORMs are unlocked
+                    $isUnlocked = true;
+                } else if ($scormIndexDone === -1 && $scormIndex === 1) {
+                    // First SCORM when nothing is done yet
+                    $isUnlocked = true;
+                } else if ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
+                    // Only the NEXT SCORM after the last completed one
+                    $isUnlocked = true;
+                }
                 
+                // Determine cardclass
                 if ($progresspercent >= 100) {
                     // Completed - 100% progress
                     $cardclass = 'completed';
@@ -536,12 +561,25 @@ if ($courseimageurl) :
                     // Currently in progress
                     $cardclass = 'current';
                 } else if ($isUnlocked && $progresspercent <= 0) {
-                    // Unlocked but not started
-                    $cardclass = 'current';
+                    // Only unlock the NEXT not-started SCORM (after completed one)
+                    // Check if this is the next SCORM after last completed
+                    if ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
+                        $cardclass = 'current';
+                    } else if ($scormIndexDone === -1 && $scormIndex === 1) {
+                        // First SCORM when nothing is done
+                        $cardclass = 'current';
+                    } else {
+                        // Shouldn't reach here, but default to locked
+                        $cardclass = 'locked';
+                    }
                 } else {
                     // Locked - not yet unlocked
                     $cardclass = 'locked';
                 }
+                
+                // DEBUG OUTPUT
+                $debugOutput[] = "SCORM Index: $scormIndex | Progress: $progresspercent% | scormIndexDone: $scormIndexDone | isUnlocked: " . ($isUnlocked ? 'YES' : 'NO');
+                $debugOutput[] = "  └─ SCORM $scormIndex: cardclass=$cardclass";
 
                 // Get localized SCORM title if available
                 $scorm_title = $mod->name;
@@ -651,6 +689,25 @@ if ($courseimageurl) :
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+        
+        <!-- OUTPUT DEBUG INFO AFTER SECOND PASS -->
+        <?php if (CUSTOMCOURSE_DEBUG) { ?>
+        <div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>
+            <strong>DEBUG OUTPUT:</strong><br>
+            <?php 
+            if (!empty($debugFirstPass)) {
+                echo "<strong>First Pass:</strong><br>";
+                foreach ($debugFirstPass as $msg) {
+                    echo "$msg <br>";
+                }
+            }
+            echo "<strong>Second Pass Details:</strong><br>";
+            foreach ($debugOutput as $msg) {
+                echo "$msg <br>";
+            }
+            ?>
+        </div>
+        <?php } ?>
 
         <div class="course-content">
             <?php //echo $OUTPUT->main_content(); ?>
