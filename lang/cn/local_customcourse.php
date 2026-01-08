@@ -7,6 +7,7 @@ $string['success'] = '通过';
 $string['failed'] = '未通过';
 $string['completed'] = '已完成';
 $string['incomplete'] = '进行中';
+$string['not_started'] = '未开始';
 $string['unknown'] = '不适用';
 $string['lbl_attempt'] = '尝试次数：';
 $string['lbl_time'] = '时间：';

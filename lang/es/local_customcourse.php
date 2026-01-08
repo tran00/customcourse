@@ -7,6 +7,7 @@ $string['success'] = 'Aprobado';
 $string['failed'] = 'Fallido';
 $string['completed'] = 'Completado';
 $string['incomplete'] = 'En progreso';
+$string['not_started'] = 'No iniciado';
 $string['unknown'] = 'N/D';
 $string['lbl_attempt'] = 'Intento(s): ';
 $string['lbl_time'] = 'Tiempo: ';

@@ -7,6 +7,7 @@ $string['success'] = 'ناجح';
 $string['failed'] = 'فشل';
 $string['completed'] = 'مكتمل';
 $string['incomplete'] = 'قيد التقدم';
+$string['not_started'] = 'لم يبدأ';
 $string['unknown'] = 'غير متوفر';
 $string['lbl_attempt'] = 'محاولة/محاولات: ';
 $string['lbl_time'] = 'الوقت: ';

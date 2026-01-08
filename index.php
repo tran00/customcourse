@@ -210,28 +210,56 @@ if ($courseimageurl) :
             //         $scorms[] = $cm;
             //     }
             // }
-            // Fetch all SCORM modules truly attached to this course
-            $sql = "
-                SELECT cm.id AS cmid, cm.instance AS scormid, cm.visible, s.*, cm.section
-                FROM {course_modules} cm
-                JOIN {modules} m ON m.id = cm.module
-                JOIN {scorm} s ON s.id = cm.instance
-                WHERE cm.course = :courseid
-                AND m.name = 'scorm'
-                ORDER BY cm.section, cm.id
-            ";
-            $mods = $DB->get_records_sql($sql, ['courseid' => $courseid]);
-
-            // Optional: only include visible modules for the user
-            $scorms = [];
-            foreach ($mods as $mod) {
-                if ($mod->visible) {
-                    $scorms[] = $mod;
+            // Fetch course sections and build list of module IDs that should be shown
+            $sections = $DB->get_records('course_sections', ['course' => $courseid], 'section ASC');
+            $valid_cmids = [];
+            foreach ($sections as $section) {
+                if ($section->visible && $section->sequence) {
+                    $sequence_array = array_filter(explode(',', $section->sequence));
+                    $valid_cmids = array_merge($valid_cmids, $sequence_array);
                 }
             }
+            
+            if (empty($valid_cmids)) {
+                $mods = [];
+            } else {
+                // Fetch only SCORM modules that are in the valid sequence
+                list($insql, $params) = $DB->get_in_or_equal($valid_cmids, SQL_PARAMS_NAMED);
+                $params['courseid'] = $courseid;
+                $sql = "
+                    SELECT cm.id AS cmid, cm.instance AS scormid, cm.visible, s.*, cm.section
+                    FROM {course_modules} cm
+                    JOIN {modules} m ON m.id = cm.module
+                    JOIN {scorm} s ON s.id = cm.instance
+                    WHERE cm.id $insql
+                    AND cm.course = :courseid
+                    AND m.name = 'scorm'
+                    AND cm.visible = 1
+                    AND cm.deletioninprogress = 0
+                ";
+                $mods = $DB->get_records_sql($sql, $params);
+            }
+            
+            // Sort SCORMs by their position in course_sections sequence
+            $mods_array = array_values($mods);
+            usort($mods_array, function($a, $b) use ($DB) {
+                if ($a->section !== $b->section) {
+                    return $a->section - $b->section;
+                }
+                $cs = $DB->get_record('course_sections', ['id' => $a->section]);
+                if (!$cs || !$cs->sequence) {
+                    return 0;
+                }
+                $sequence_array = array_filter(explode(',', $cs->sequence));
+                $pos_a = array_search($a->cmid, $sequence_array);
+                $pos_b = array_search($b->cmid, $sequence_array);
+                if ($pos_a === false) $pos_a = PHP_INT_MAX;
+                if ($pos_b === false) $pos_b = PHP_INT_MAX;
+                return $pos_a - $pos_b;
+            });
+            $mods = $mods_array;
 
-            // Get the first SCORM
-            $firstscorm = reset($scorms);
+            $scorms = array_values($mods);
             $buttonlabel = '';
 
 
@@ -250,6 +278,7 @@ if ($courseimageurl) :
             $buttonUrl = null;
             $buttonLabel = '';
             $scormIndexDone = -1;
+            $scormIndexStarted = -1;
             $scormIndex = 0;
             $visibleModsCount = 0;
 
@@ -272,6 +301,10 @@ if ($courseimageurl) :
                 $attemptid = $DB->get_field('scorm_attempt', 'id', ['scormid'=>$scormid,'userid'=>$userid]);
                 $attemptcount = $DB->get_field('scorm_attempt', 'attempt', ['scormid'=>$scormid,'userid'=>$userid]);
                 
+                // get progress
+                $progress = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]);
+                $progresspercent = $progress * 100;
+                
                 // get success and completion based on version
                 $status_done = false;
                 $completion_raw = null;
@@ -286,9 +319,12 @@ if ($courseimageurl) :
                     $status_done = ($lesson_status === 'completed' || $lesson_status === 'passed');
                 }
 
-                // Track the last completed SCORM
-                if($status_done) {
+                // Track the last completed SCORM and first started SCORM
+                if($status_done || $progresspercent >= 100) {
                     $scormIndexDone = $scormIndex;
+                }
+                if($progresspercent > 0 && $scormIndexStarted === -1) {
+                    $scormIndexStarted = $scormIndex;
                 }
 
                 // If we haven't set a button URL yet, determine it based on sequence
@@ -300,11 +336,7 @@ if ($courseimageurl) :
                     } elseif ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
                         // This is the next unlocked SCORM after completion
                         $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
-                        if($completion_raw === 'incomplete' || $success_raw === 'failed') {
-                            $buttonLabel = get_string('btn-continue', 'local_customcourse');
-                        } else {
-                            $buttonLabel = get_string('btn-play', 'local_customcourse');
-                        }
+                        $buttonLabel = get_string('btn-play', 'local_customcourse');
                     }
                 }
             endforeach;
@@ -385,9 +417,16 @@ if ($courseimageurl) :
                 $userid = $USER->id;
                 $scormVersion = $scorm->version;
                 
-                $style_completion = isset($style_completion) ? $style_completion : '';
-                $style_success    = isset($style_success) ? $style_success : '';
-                $style_score      = isset($style_score) ? $style_score : '';
+                // Set defaults for all fields
+                $style_completion = '';
+                $style_success    = '';
+                $style_score      = '';
+                $success = get_string('unknown', 'local_customcourse');
+                $completion = get_string('not_started', 'local_customcourse');
+                $score_raw = '0';
+                $scoreMax = '0';
+                $score_html = '';
+                $totaltime_in_seconds = '-';
                         
                 // Get all attempts for this user and SCORM
                 $attemptid = $DB->get_field('scorm_attempt', 'id', ['scormid'=>$scormid,'userid'=>$userid]);
@@ -399,46 +438,81 @@ if ($courseimageurl) :
                 // normalize progress to percent
                 $progresspercent = $progress * 100;
 
-                // score
-                $score_raw = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.raw']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.raw']]);
-                $score_raw = round($score_raw);
-                $score_html = is_null($score_raw) ? '' : html_writer::span('', 'circle-progress', ['style' => "--percent:{$score_raw}"]);
+                // Get duration early - will be overridden if progress is 0
+                $duration = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.total_time']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.total_time']]);
+                // Convert duration to seconds - only if data exists
+                if (!is_null($duration)) {
+                    $totaltime_in_seconds = $scormVersion != "SCORM_1.2" ? scorm_duration_to_seconds($duration) : scorm_duration_to_seconds_1_2($duration);
+                    $totaltime_in_seconds = secondsToTime($totaltime_in_seconds);
+                }
 
-                // max score
-                $scoreMax = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.max']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.max']]);
-                $scoreMax = round($scoreMax);
+                // score - only assign if data exists
+                $score_raw_db = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.raw']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.raw']]);
+                if (!is_null($score_raw_db)) {
+                    $score_raw = round($score_raw_db);
+                    $score_html = html_writer::span('', 'circle-progress', ['style' => "--percent:{$score_raw}"]);
+                }
+
+                // max score - only assign if data exists
+                $scoreMax_db = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.max']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.max']]);
+                if (!is_null($scoreMax_db)) {
+                    $scoreMax = round($scoreMax_db);
+                }
                 
-                // get success and completion
-                $success_raw = get_string('unknown', 'local_customcourse');
-                $completion_raw = get_string('unknown', 'local_customcourse');
-                $completion = '';
-                $lesson_status = '';
+                // get success and completion - only assign if data exists
+                $success_raw = null;
+                $completion_raw = null;
+                $lesson_status = get_string('not_started', 'local_customcourse');
                 if( $scormVersion != "SCORM_1.2") {
                     $success_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]);
                     $completion_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]);
                     $status_done = ($completion_raw === 'completed' && $success_raw === 'passed');
                 } else {
-                    $lesson_status = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]);
-                    $status_done = ($lesson_status === 'completed' || $lesson_status === 'passed');
+                    $lesson_status_db = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]);
+                    if (!is_null($lesson_status_db)) {
+                        $lesson_status = $lesson_status_db;
+                    }
+                    $status_done = ($lesson_status_db === 'completed' || $lesson_status_db === 'passed');
                 }
+                
+                // Only update success if we have data
                 if ($success_raw === 'passed') {
                     $style_success = 'green';
                     $success = get_string('success', 'local_customcourse');
                 } elseif ($success_raw === 'failed') {
                     $style_success = 'red';
                     $success = get_string('failed', 'local_customcourse');
-                }   else {
-                    $success = ''; //get_string('unknown', 'local_customcourse');
+                } else {
+                    // Keep default: 'unknown'
                 }
-                if ($completion_raw === 'completed') {
+                
+                // Check if progress is 0 (not started)
+                if ($progresspercent <= 0) {
+                    $style_completion = 'black';
+                    $completion = get_string('not_started', 'local_customcourse');
+                    // Reset to defaults
+                    $success = get_string('unknown', 'local_customcourse');
+                    $style_success = '';
+                    $score_raw = '0';
+                    $scoreMax = '0';
+                    $totaltime_in_seconds = '-';
+                } else if ($completion_raw === 'completed') {
                     $style_completion = 'green';
                     $completion = get_string('completed', 'local_customcourse');
                     $progresspercent = 100;
                 } elseif ($completion_raw === 'incomplete') {
-                    $style_completion = 'red';
+                    $style_completion = 'blue';
                     $completion = get_string('incomplete', 'local_customcourse');
-                }   else {
-                    $completion = ''; // get_string('unknown', 'local_customcourse');
+                    // If progress is 100%, mark as completed regardless of completion status
+                    if ($progresspercent >= 100) {
+                        $style_completion = 'green';
+                        $completion = get_string('completed', 'local_customcourse');
+                        $progresspercent = 100;
+                    }
+                } else {
+                    // If progress > 0 but no completion data, show as incomplete/in progress
+                    $style_completion = 'blue';
+                    $completion = get_string('incomplete', 'local_customcourse');
                 }
                 if($scormVersion == "SCORM_1.2" && $lesson_status && ($lesson_status === 'completed' || $lesson_status === 'passed')) {
                     $completion = get_string('completed', 'local_customcourse');
@@ -448,26 +522,24 @@ if ($courseimageurl) :
 
                 // echo $scormIndex . ' - ' . $completion_raw . ' / ' . $success_raw . '<br>';
 
-                $duration = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.total_time']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.total_time']]);
-                // Convert duration to seconds
-                $totaltime_in_seconds = $scormVersion != "SCORM_1.2" ? scorm_duration_to_seconds($duration) : scorm_duration_to_seconds_1_2($duration);
-                $totaltime_in_seconds = secondsToTime($totaltime_in_seconds);
-
-
                 // Check if SCORM is done
                 // if($status_done) {
                 //     $scormIndexDone = $scormIndex;
-                // }
-
-                // echo "current scorm index: $scormIndex / $scormIndexDone / $status_done<br>";
-                if($scormIndex === $scormIndexDone + 1 && $scormIndexDone > -1 && !$status_done) {
-                    $isScormAfterDone = true;
-                } 
-                if ($isScormAfterDone || $scormIndexDone == -1 && $scormIndex == 1) {
-                    $cardclass = 'current';
-                } else if ($status_done) {
+                // }                // Determine if this SCORM is unlocked (started or finished)
+                // echo "current scorm index: $scormIndex / $scormIndexDone / $progresspercent<br>";
+                $isUnlocked = ($scormIndex <= $scormIndexDone + 1 && $scormIndexDone > -1) || ($scormIndexDone === -1 && $scormIndex === 1);
+                
+                if ($progresspercent >= 100) {
+                    // Completed - 100% progress
                     $cardclass = 'completed';
+                } else if ($isUnlocked && $progresspercent > 0) {
+                    // Currently in progress
+                    $cardclass = 'current';
+                } else if ($isUnlocked && $progresspercent <= 0) {
+                    // Unlocked but not started
+                    $cardclass = 'current';
                 } else {
+                    // Locked - not yet unlocked
                     $cardclass = 'locked';
                 }
 
@@ -479,9 +551,26 @@ if ($courseimageurl) :
                 if (get_string_manager()->string_exists($localized_title_key, 'local_customcourse')) {
                     $scorm_title = get_string($localized_title_key, 'local_customcourse');
                 }
+                
+                // Determine button label based on progression
+                if ($progresspercent >= 100) {
+                    $cardButtonLabel = get_string('btn-play-again', 'local_customcourse');
+                } else if ($progresspercent > 0) {
+                    $cardButtonLabel = get_string('btn-continue', 'local_customcourse');
+                } else {
+                    $cardButtonLabel = get_string('btn-play', 'local_customcourse');
+                }
+
+                // Ensure completion and lesson_status are never empty
+                if (empty($completion) || !isset($completion)) {
+                    $completion = get_string('not_started', 'local_customcourse');
+                }
+                if (empty($lesson_status) || !isset($lesson_status)) {
+                    $lesson_status = get_string('not_started', 'local_customcourse');
+                }
 
             ?>
-            <div class="scorm-card <?php echo $cardclass; ?>">
+            <div class="scorm-card <?php echo $cardclass; ?>" data-id="<?php echo $mod->cmid; ?>" data-scormid="<?php echo $scormid; ?>">
                 <div class="scorm-thumb">
                     <?php if ($cardclass === 'locked'): ?>
                         <div class="scorm-title locked-title"><?php echo $intro; ?></div>
@@ -507,12 +596,12 @@ if ($courseimageurl) :
                                         <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
                                     <?php else: ?>
                                         <div><?php echo get_string('lbl_completion', 'local_customcourse'); ?><b><span class="<?php echo $style_completion; ?>"><?php echo $lesson_status; ?></span></b></div>
-                                        <div>&nbsp;</div>
+                                        <div><?php echo get_string('lbl_success', 'local_customcourse'); ?><b><span class="<?php echo $style_success; ?>"><?php echo $success; ?></span></b></div>
                                     <?php endif; ?>
-                                    <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><b><?php echo ($cardclass === 'locked' ? '' :  $totaltime_in_seconds); ?></b></div>
+                                    <div><?php echo get_string('lbl_time', 'local_customcourse'); ?><b><?php echo $totaltime_in_seconds; ?></b></div>
 
                                 
-                                    <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span class="<?php echo $style_score; ?>"><?php echo ($cardclass === 'locked' ? '' : $score_raw . '/' . $scoreMax); ?></span></b></div>
+                                    <div><?php echo get_string('lbl_score', 'local_customcourse'); ?><b><span class="<?php echo $style_score; ?>"><?php echo $score_raw . '/' . $scoreMax; ?></span></b></div>
                                 
                                     <?php /*
 
@@ -551,14 +640,10 @@ if ($courseimageurl) :
                         </div>
                     </div>
                     <div class="btns">
-                        <?php if($status_done): ?>
-                            <a href="<?php echo $url; ?>" class="btn btn-play-again"><?php echo get_string('btn-play-again', 'local_customcourse'); ?></a>
-                        <?php elseif ($attemptcount > 0): ?>
-                            <a href="<?php echo $url; ?>" class="btn btn-continue"><?php echo get_string('btn-continue', 'local_customcourse'); ?></a>
-                        <?php elseif ($attemptcount == 0 && $cardclass !== 'locked'): ?>
-                            <a href="<?php echo $url; ?>" class="btn btn-play"><?php echo get_string('btn-play', 'local_customcourse'); ?></a>
-                        <?php else: ?>
+                        <?php if($cardclass === 'locked'): ?>
                             <div class="btn btn-play disabled"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
+                        <?php else: ?>
+                            <a href="<?php echo $url; ?>" class="btn btn-<?php echo ($progresspercent >= 100 ? 'play-again' : ($progresspercent > 0 ? 'continue' : 'play')); ?>"><?php echo $cardButtonLabel; ?></a>
                         <?php endif; ?> 
                     </div>
                 </div>
