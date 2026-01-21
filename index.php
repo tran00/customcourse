@@ -115,6 +115,78 @@ function secondsToTime($seconds) {
     
 }
 
+/**
+ * Get all attempts for a user and SCORM, sorted by attempt number
+ */
+function get_all_attempts($scormid, $userid) {
+    global $DB;
+    return $DB->get_records('scorm_attempt', 
+        ['scormid' => $scormid, 'userid' => $userid], 
+        'attempt ASC'
+    );
+}
+
+/**
+ * Get the attempt with the highest score across all attempts
+ */
+function get_best_score_attempt($scormid, $userid, $element_ids, $scormVersion) {
+    global $DB;
+    
+    $attempts = get_all_attempts($scormid, $userid);
+    if (empty($attempts)) {
+        return null;
+    }
+    
+    $bestAttempt = null;
+    $bestScore = -1;
+    
+    $scoreRawElement = $scormVersion != "SCORM_1.2" ? $element_ids['cmi.score.raw'] : $element_ids['cmi.core.score.raw '];
+    
+    foreach ($attempts as $attempt) {
+        $scoreRaw = $DB->get_field('scorm_scoes_value', 'value', 
+            ['attemptid' => $attempt->id, 'elementid' => $scoreRawElement]
+        );
+        
+        if ($scoreRaw !== null && (float)$scoreRaw > $bestScore) {
+            $bestScore = (float)$scoreRaw;
+            $bestAttempt = $attempt;
+        }
+    }
+    
+    // If no score found, return the last attempt (most recent)
+    return $bestAttempt ?: end($attempts);
+}
+
+/**
+ * Calculate total time across all attempts
+ */
+function get_total_time_all_attempts($scormid, $userid, $element_ids, $scormVersion) {
+    global $DB;
+    
+    $attempts = get_all_attempts($scormid, $userid);
+    if (empty($attempts)) {
+        return 0;
+    }
+    
+    $totalTimeElement = $scormVersion != "SCORM_1.2" ? $element_ids['cmi.total_time'] : $element_ids['cmi.core.total_time'];
+    $totalSeconds = 0;
+    
+    foreach ($attempts as $attempt) {
+        $duration = $DB->get_field('scorm_scoes_value', 'value', 
+            ['attemptid' => $attempt->id, 'elementid' => $totalTimeElement]
+        );
+        
+        if ($duration !== null) {
+            $seconds = $scormVersion != "SCORM_1.2" 
+                ? scorm_duration_to_seconds($duration) 
+                : scorm_duration_to_seconds_1_2($duration);
+            $totalSeconds += $seconds;
+        }
+    }
+    
+    return $totalSeconds;
+}
+
 echo $OUTPUT->doctype();
 
 ?>
@@ -302,12 +374,13 @@ if ($courseimageurl) :
                 $scormid = $scorm->id;
                 $userid = $USER->id;
 
-                // Get all attempts for this user and SCORM
-                $attemptid = $DB->get_field('scorm_attempt', 'id', ['scormid'=>$scormid,'userid'=>$userid]);
-                $attemptcount = $DB->get_field('scorm_attempt', 'attempt', ['scormid'=>$scormid,'userid'=>$userid]);
+                // Get the best attempt (highest score) for this user and SCORM
+                $bestAttempt = get_best_score_attempt($scormid, $userid, $element_ids, $scormVersion);
+                $attemptid = $bestAttempt ? $bestAttempt->id : null;
+                $attemptcount = $bestAttempt ? $bestAttempt->attempt : 0;
                 
                 // get progress
-                $progress = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]);
+                $progress = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]) : null;
                 $progresspercent = ($progress !== null) ? $progress * 100 : 0;
                 
                 // get success and completion based on version
@@ -316,11 +389,11 @@ if ($courseimageurl) :
                 $success_raw = null;
                 
                 if( $scormVersion != "SCORM_1.2") {
-                    $success_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]);
-                    $completion_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]);
+                    $success_raw = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]) : null;
+                    $completion_raw = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]) : null;
                     $status_done = ($completion_raw === 'completed' && $success_raw === 'passed');
                 } else {
-                    $lesson_status = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]);
+                    $lesson_status = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]) : null;
                     $status_done = ($lesson_status === 'completed' || $lesson_status === 'passed');
                 }
 
@@ -437,33 +510,32 @@ if ($courseimageurl) :
                 $score_html = '';
                 $totaltime_in_seconds = '-';
                         
-                // Get all attempts for this user and SCORM
-                $attemptid = $DB->get_field('scorm_attempt', 'id', ['scormid'=>$scormid,'userid'=>$userid]);
-                $attemptcount = $DB->get_field('scorm_attempt', 'attempt', ['scormid'=>$scormid,'userid'=>$userid]);
+                // Get the best attempt (highest score) for this user and SCORM
+                $bestAttempt = get_best_score_attempt($scormid, $userid, $element_ids, $scormVersion);
+                $attemptid = $bestAttempt ? $bestAttempt->id : null;
+                $attemptcount = $bestAttempt ? $bestAttempt->attempt : 0;
             
                 // get progress
-                $progress = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]);
+                $progress = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.progress_measure']]) : null;
                 //echo $attemptid . ' // ' . $element_ids['cmi.progress_measure'] . ' // ' . $progress . '<br>';
                 // normalize progress to percent
                 $progresspercent = ($progress !== null) ? $progress * 100 : 0;
 
-                // Get duration early - will be overridden if progress is 0
-                $duration = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.total_time']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.total_time']]);
-                // Convert duration to seconds - only if data exists
-                if (!is_null($duration)) {
-                    $totaltime_in_seconds = $scormVersion != "SCORM_1.2" ? scorm_duration_to_seconds($duration) : scorm_duration_to_seconds_1_2($duration);
-                    $totaltime_in_seconds = secondsToTime($totaltime_in_seconds);
+                // Get duration from all attempts - calculate total time across all attempts
+                $totalTimeSeconds = get_total_time_all_attempts($scormid, $userid, $element_ids, $scormVersion);
+                if ($totalTimeSeconds > 0) {
+                    $totaltime_in_seconds = secondsToTime($totalTimeSeconds);
                 }
 
-                // score - only assign if data exists
-                $score_raw_db = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.raw']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.raw']]);
+                // score - only assign if data exists (from best attempt)
+                $score_raw_db = $attemptid ? ($scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.raw']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.raw']])) : null;
                 if (!is_null($score_raw_db)) {
                     $score_raw = round($score_raw_db);
                     $score_html = html_writer::span('', 'circle-progress', ['style' => "--percent:{$score_raw}"]);
                 }
 
-                // max score - only assign if data exists
-                $scoreMax_db = $scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.max']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.max']]);
+                // max score - only assign if data exists (from best attempt)
+                $scoreMax_db = $attemptid ? ($scormVersion != "SCORM_1.2" ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.score.max']]) : $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.score.max']])) : null;
                 if (!is_null($scoreMax_db)) {
                     $scoreMax = round($scoreMax_db);
                 }
@@ -473,11 +545,11 @@ if ($courseimageurl) :
                 $completion_raw = null;
                 $lesson_status = get_string('not_started', 'local_customcourse');
                 if( $scormVersion != "SCORM_1.2") {
-                    $success_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]);
-                    $completion_raw = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]);
+                    $success_raw = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.success_status']]) : null;
+                    $completion_raw = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.completion_status']]) : null;
                     $status_done = ($completion_raw === 'completed' && $success_raw === 'passed');
                 } else {
-                    $lesson_status_db = $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]);
+                    $lesson_status_db = $attemptid ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$element_ids['cmi.core.lesson_status']]) : null;
                     if (!is_null($lesson_status_db)) {
                         $lesson_status = $lesson_status_db;
                     }
