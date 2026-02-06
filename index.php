@@ -451,7 +451,7 @@ if ($courseimageurl) :
             // 4. Print the button above the list
             echo '<div class="general-scorm-btn">';
             if ($buttonUrl) {
-                echo '<a href="' . $buttonUrl . '" class="btn btn-general">';
+                echo '<a href="' . $buttonUrl . '" class="btn btn-general" target="_blank">';
                 echo $buttonLabel;
                 echo '</a>';
             }
@@ -758,7 +758,7 @@ if ($courseimageurl) :
                         <?php if($cardclass === 'locked'): ?>
                             <div class="btn btn-play disabled"><?php echo get_string('btn-play', 'local_customcourse'); ?></div>
                         <?php else: ?>
-                            <a href="<?php echo $url; ?>" class="btn btn-<?php echo ($progresspercent >= 100 ? 'play-again' : ($progresspercent > 0 ? 'continue' : 'play')); ?>"><?php echo $cardButtonLabel; ?></a>
+                            <a href="<?php echo $url; ?>" class="btn btn-<?php echo ($progresspercent >= 100 ? 'play-again' : ($progresspercent > 0 ? 'continue' : 'play')); ?>" target="_blank"><?php echo $cardButtonLabel; ?></a>
                         <?php endif; ?> 
                     </div>
                 </div>
