@@ -734,7 +734,7 @@ if ($courseimageurl) :
                         <div class="scorm-title locked-title"><?php echo $intro; ?></div>
                         <div class="lock"><img src="assets/img/icon_lock.png" alt=""></div>
                     <?php else: ?>
-                        <a href="<?php echo $url; ?>"><?php echo $intro; ?></a>
+                        <a href="<?php echo $url; ?>" target="_blank"><?php echo $intro; ?></a>
                     <?php endif; ?>
                 </div>
                 <div class="scorm-details">
@@ -742,7 +742,7 @@ if ($courseimageurl) :
                         <?php if ($cardclass === 'locked'): ?>
                             <div class="scorm-title"><?php echo format_string($scorm_title); ?></div>
                         <?php else: ?>
-                            <a href="<?php echo $url; ?>" class="scorm-title"><?php echo format_string($scorm_title); ?></a>
+                            <a href="<?php echo $url; ?>" class="scorm-title" target="_blank"><?php echo format_string($scorm_title); ?></a>
                         <?php endif; ?>
                     </strong>
                     <div class="bottom-part">
