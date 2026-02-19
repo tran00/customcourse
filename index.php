@@ -49,7 +49,8 @@ $elements = [
     'cmi.core.score.raw',
     'cmi.core.score.min',
     'cmi.core.score.max',
-    'cmi.core.total_time'
+    'cmi.core.total_time',
+    'cmi.suspend_data'
 ];
 
 // Fetch records from the Moodle DB API
@@ -113,6 +114,151 @@ function secondsToTime($seconds) {
 
     return implode('', $parts);
     
+}
+
+/**
+ * Parse SCORM 1.2 suspend_data to extract progress percentage
+ * Handles base64+zlib compressed JSON data with playerLastPosition/chapters
+ * 
+ * @param string $suspendData The raw suspend_data value
+ * @param string|null $lessonStatus The lesson_status value for fallback
+ * @param float|null $scoreRaw The score.raw value for fallback
+ * @return float Progress percentage (0-100)
+ */
+function parse_scorm_12_suspend_data($suspendData, $lessonStatus = null, $scoreRaw = null) {
+    $progressPercent = 0;
+    $progressProcessed = false;
+    
+    // Check if completed based on status first
+    if ($lessonStatus && in_array(strtolower($lessonStatus), ['passed', 'completed', 'complete', 'satisfied'])) {
+        return 100.0;
+    }
+    
+    if (empty($suspendData) || $suspendData === '0') {
+        return 0.0;
+    }
+    
+    // Try parsing as direct numeric value
+    if (is_numeric($suspendData)) {
+        $progressFloat = (float)$suspendData;
+        if ($progressFloat <= 1) {
+            return $progressFloat * 100;
+        }
+        return min($progressFloat, 100);
+    }
+    
+    // Check for custom formats with :: or _
+    if (strpos($suspendData, '::') !== false || strpos($suspendData, '_') !== false) {
+        if (strpos($suspendData, '1/1') !== false || strpos($suspendData, 'c:1') !== false) {
+            return 100.0;
+        }
+    }
+    
+    // Try JSON parsing for plain JSON data
+    if (strpos($suspendData, '{') === 0) {
+        $jsonData = @json_decode($suspendData, true);
+        if ($jsonData) {
+            if (isset($jsonData['progress'])) {
+                $progVal = (float)$jsonData['progress'];
+                return ($progVal <= 1) ? $progVal * 100 : min($progVal, 100);
+            }
+            if (isset($jsonData['completionStatus']) && $jsonData['completionStatus'] === 'completed') {
+                return 100.0;
+            }
+            if (isset($jsonData['didReachEnd']) && $jsonData['didReachEnd']) {
+                return 100.0;
+            }
+            if (isset($jsonData['playerLastPosition'])) {
+                return parse_player_last_position($jsonData);
+            }
+        }
+    }
+    
+    // Try base64 decoding with zlib decompression
+    try {
+        // Clean the suspend_data: replace URL-safe chars and remove delimiters
+        $cleanData = str_replace(['-', '_', '::', ':'], ['+', '/', '', ''], $suspendData);
+        
+        // Add padding if needed
+        $padding = strlen($cleanData) % 4;
+        if ($padding > 0) {
+            $cleanData .= str_repeat('=', 4 - $padding);
+        }
+        
+        $decoded = @base64_decode($cleanData, true);
+        if ($decoded !== false) {
+            // Try zlib decompression
+            $decompressed = @gzuncompress($decoded);
+            if ($decompressed === false) {
+                // Try gzinflate (raw deflate)
+                $decompressed = @gzinflate($decoded);
+            }
+            if ($decompressed === false) {
+                // Try gzdecode (gzip format)
+                $decompressed = @gzdecode($decoded);
+            }
+            
+            if ($decompressed !== false) {
+                $jsonData = @json_decode($decompressed, true);
+                if ($jsonData) {
+                    if (isset($jsonData['didReachEnd']) && $jsonData['didReachEnd']) {
+                        return 100.0;
+                    }
+                    if (isset($jsonData['playerLastPosition'])) {
+                        return parse_player_last_position($jsonData);
+                    }
+                    if (isset($jsonData['progress'])) {
+                        $progVal = (float)$jsonData['progress'];
+                        return ($progVal <= 1) ? $progVal * 100 : min($progVal, 100);
+                    }
+                    if (isset($jsonData['completionStatus']) && $jsonData['completionStatus'] === 'completed') {
+                        return 100.0;
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        // Silently fail and return default
+    }
+    
+    // Fallback: if score is 100, consider it complete
+    if ($scoreRaw !== null && ((float)$scoreRaw >= 100 || (float)$scoreRaw == 100)) {
+        return 100.0;
+    }
+    
+    return $progressPercent;
+}
+
+/**
+ * Parse playerLastPosition from decompressed JSON to calculate progress
+ */
+function parse_player_last_position($jsonData) {
+    if (!isset($jsonData['playerLastPosition']['lastPosition'])) {
+        return 0.0;
+    }
+    
+    $lastPosition = (float)$jsonData['playerLastPosition']['lastPosition'];
+    $totalTime = 0;
+    
+    // Try to get total time from chapters
+    if (isset($jsonData['chapters']) && isset($jsonData['playerLastPosition']['chapterId'])) {
+        $chapterId = $jsonData['playerLastPosition']['chapterId'];
+        if ($chapterId && isset($jsonData['chapters'][$chapterId]['end'])) {
+            $totalTime = (float)$jsonData['chapters'][$chapterId]['end'];
+        }
+    }
+    
+    // Fallback to totalDuration
+    if ($totalTime == 0 && isset($jsonData['totalDuration'])) {
+        $totalTime = (float)$jsonData['totalDuration'];
+    }
+    
+    if ($totalTime > 0 && $lastPosition > 0) {
+        $progress = ($lastPosition / $totalTime) * 100;
+        return round(min(max($progress, 0), 100));
+    }
+    
+    return 0.0;
 }
 
 /**
@@ -411,15 +557,26 @@ if ($courseimageurl) :
                     $completion_raw = ($attemptid && $completionElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$completionElementId]) : null;
                     $status_done = ($completion_raw === 'completed' && $success_raw === 'passed');
                 } else {
-                    // SCORM 1.2 - use lesson_status to determine both progress and completion
+                    // SCORM 1.2 - use lesson_status and suspend_data to determine progress and completion
                     $lessonStatusElementId = $element_ids['cmi.core.lesson_status'] ?? null;
                     $lesson_status = ($attemptid && $lessonStatusElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$lessonStatusElementId]) : null;
                     $status_done = ($lesson_status === 'completed' || $lesson_status === 'passed');
-                    // For SCORM 1.2, set progress based on lesson_status
+                    
+                    // Get suspend_data for progress calculation
+                    $suspendDataElementId = $element_ids['cmi.suspend_data'] ?? null;
+                    $suspendData = ($attemptid && $suspendDataElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$suspendDataElementId]) : null;
+                    
+                    // Get score for fallback
+                    $scoreRawElementId = $element_ids['cmi.core.score.raw'] ?? null;
+                    $scoreRaw = ($attemptid && $scoreRawElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$scoreRawElementId]) : null;
+                    
+                    // For SCORM 1.2, set progress based on suspend_data parsing
                     if ($status_done) {
                         $progresspercent = 100;
+                    } elseif ($suspendData) {
+                        $progresspercent = parse_scorm_12_suspend_data($suspendData, $lesson_status, $scoreRaw);
                     } elseif ($lesson_status && $lesson_status !== 'not attempted') {
-                        $progresspercent = 0; // In progress
+                        $progresspercent = 50; // In progress but no suspend_data
                     }
                 }
 
@@ -596,11 +753,18 @@ if ($courseimageurl) :
                     } elseif ($lesson_status_db === 'failed') {
                         $success_raw = 'failed';
                     }
-                    // For SCORM 1.2, set progress based on lesson_status
+                    
+                    // Get suspend_data for progress calculation
+                    $suspendDataElementId = $element_ids['cmi.suspend_data'] ?? null;
+                    $suspendData = ($attemptid && $suspendDataElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$suspendDataElementId]) : null;
+                    
+                    // For SCORM 1.2, set progress based on suspend_data parsing
                     if ($status_done) {
                         $progresspercent = 100;
+                    } elseif ($suspendData) {
+                        $progresspercent = parse_scorm_12_suspend_data($suspendData, $lesson_status_db, $score_raw_db);
                     } elseif ($lesson_status_db && $lesson_status_db !== 'not attempted') {
-                        $progresspercent = 50; // In progress
+                        $progresspercent = 50; // In progress but no suspend_data
                     }
                 }
                 
