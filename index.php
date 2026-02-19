@@ -46,9 +46,9 @@ $elements = [
     'cmi.total_time',
     'cmi.progress_measure',
     'cmi.core.lesson_status',
-    'cmi.core.score.raw ',
-    'cmi.core.score.min ',
-    'cmi.core.score.max ',
+    'cmi.core.score.raw',
+    'cmi.core.score.min',
+    'cmi.core.score.max',
     'cmi.core.total_time'
 ];
 
@@ -142,7 +142,7 @@ function get_best_score_attempt($scormid, $userid, $element_ids, $scormVersion) 
     
     $scoreRawElement = $scormVersion != "SCORM_1.2" 
         ? ($element_ids['cmi.score.raw'] ?? null) 
-        : ($element_ids['cmi.core.score.raw '] ?? null);
+        : ($element_ids['cmi.core.score.raw'] ?? null);
     
     // If element ID not found, return the last attempt
     if ($scoreRawElement === null) {
@@ -419,7 +419,7 @@ if ($courseimageurl) :
                     if ($status_done) {
                         $progresspercent = 100;
                     } elseif ($lesson_status && $lesson_status !== 'not attempted') {
-                        $progresspercent = 50; // In progress
+                        $progresspercent = 0; // In progress
                     }
                 }
 
@@ -556,7 +556,7 @@ if ($courseimageurl) :
                 // score - only assign if data exists (from best attempt)
                 $scoreRawElementId = $scormVersion != "SCORM_1.2" 
                     ? ($element_ids['cmi.score.raw'] ?? null) 
-                    : ($element_ids['cmi.core.score.raw '] ?? null);
+                    : ($element_ids['cmi.core.score.raw'] ?? null);
                 $score_raw_db = ($attemptid && $scoreRawElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$scoreRawElementId]) : null;
                 if (!is_null($score_raw_db)) {
                     $score_raw = round($score_raw_db);
@@ -566,7 +566,7 @@ if ($courseimageurl) :
                 // max score - only assign if data exists (from best attempt)
                 $scoreMaxElementId = $scormVersion != "SCORM_1.2" 
                     ? ($element_ids['cmi.score.max'] ?? null) 
-                    : ($element_ids['cmi.core.score.max '] ?? null);
+                    : ($element_ids['cmi.core.score.max'] ?? null);
                 $scoreMax_db = ($attemptid && $scoreMaxElementId) ? $DB->get_field('scorm_scoes_value', 'value', ['attemptid'=>$attemptid,'elementid'=>$scoreMaxElementId]) : null;
                 if (!is_null($scoreMax_db)) {
                     $scoreMax = round($scoreMax_db);
