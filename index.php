@@ -513,7 +513,7 @@ if ($courseimageurl) :
             // First pass: determine which SCORM to link to in the button and calculate overall progress
             $buttonUrl = null;
             $buttonLabel = '';
-            $scormIndexDone = -1;
+            $scormIndexDone = 0;
             $scormIndexStarted = -1;
             $scormIndex = 0;
             $visibleModsCount = 0;
@@ -580,9 +580,9 @@ if ($courseimageurl) :
                     }
                 }
 
-                // Track the last completed SCORM and first started SCORM
-                // Only mark as done if progress >= 100 (don't rely on status_done if progress is 0)
-                if($progresspercent >= 100) {
+                // Track the last sequentially completed SCORM
+                // Only advance if this SCORM is the next in sequence (no gaps allowed)
+                if ($progresspercent >= 100 && $scormIndex === $scormIndexDone + 1) {
                     $scormIndexDone = $scormIndex;
                     if (CUSTOMCOURSE_DEBUG) {
                         $debugFirstPass[] = "SCORM $scormIndex marked as done (progress=$progresspercent%)";
@@ -593,16 +593,10 @@ if ($courseimageurl) :
                 }
 
                 // If we haven't set a button URL yet, determine it based on sequence
-                if ($buttonUrl === null) {
-                    if ($scormIndexDone === -1 && $scormIndex === 1) {
-                        // No SCORMs done yet - link to first SCORM
-                        $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
-                        $buttonLabel = get_string('btn-play', 'local_customcourse');
-                    } elseif ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
-                        // This is the next unlocked SCORM after completion
-                        $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
-                        $buttonLabel = get_string('btn-play', 'local_customcourse');
-                    }
+                if ($buttonUrl === null && $scormIndex === $scormIndexDone + 1) {
+                    // Next SCORM to do (first if none done, or next after last sequentially completed)
+                    $buttonUrl = new moodle_url('/mod/scorm/view.php', ['id' => $cmid]);
+                    $buttonLabel = get_string('btn-play', 'local_customcourse');
                 }
             endforeach;
 
@@ -818,46 +812,16 @@ if ($courseimageurl) :
                 // Check if SCORM is done
                 // if($status_done) {
                 //     $scormIndexDone = $scormIndex;
-                // }                // Determine if this SCORM is unlocked (started or finished)
-                // Only the FIRST incomplete SCORM should be 'current' and unlocked
-                // Or if it's already started/in progress
-                // OR if it's already completed
-                $isUnlocked = false;
-                if ($progresspercent >= 100) {
-                    // Completed SCORMs are always unlocked
-                    $isUnlocked = true;
-                } else if ($progresspercent > 0) {
-                    // In-progress SCORMs are unlocked
-                    $isUnlocked = true;
-                } else if ($scormIndexDone === -1 && $scormIndex === 1) {
-                    // First SCORM when nothing is done yet
-                    $isUnlocked = true;
-                } else if ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
-                    // Only the NEXT SCORM after the last completed one
-                    $isUnlocked = true;
-                }
+                // }                // Strict sequential locking: only unlock SCORMs in order
+                // A SCORM is unlocked if it's within the completed sequence or is the next one
+                $isUnlocked = ($scormIndex <= $scormIndexDone || $scormIndex === $scormIndexDone + 1);
                 
-                // Determine cardclass
-                if ($progresspercent >= 100) {
-                    // Completed - 100% progress
+                // Determine cardclass based on sequential position
+                if ($scormIndex <= $scormIndexDone) {
                     $cardclass = 'completed';
-                } else if ($isUnlocked && $progresspercent > 0) {
-                    // Currently in progress
+                } else if ($scormIndex === $scormIndexDone + 1) {
                     $cardclass = 'current';
-                } else if ($isUnlocked && $progresspercent <= 0) {
-                    // Only unlock the NEXT not-started SCORM (after completed one)
-                    // Check if this is the next SCORM after last completed
-                    if ($scormIndexDone >= 0 && $scormIndex === $scormIndexDone + 1) {
-                        $cardclass = 'current';
-                    } else if ($scormIndexDone === -1 && $scormIndex === 1) {
-                        // First SCORM when nothing is done
-                        $cardclass = 'current';
-                    } else {
-                        // Shouldn't reach here, but default to locked
-                        $cardclass = 'locked';
-                    }
                 } else {
-                    // Locked - not yet unlocked
                     $cardclass = 'locked';
                 }
                 
